@@ -1,0 +1,226 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from .application_composition import (
+    ApplicationCompositionProject,
+    ObjectPointComplexity,
+    ObjectPointItem,
+    ObjectPointKind,
+    ProductivityLevel,
+)
+from .early_design import EarlyDesignProject
+from .enums import FunctionPointComponentType, Rating
+from .function_points import (
+    FunctionPointCalculator,
+    FunctionPointComponent,
+    FunctionPointProject,
+    build_characteristics,
+)
+from .size_conversion import BackfiringProject, LanguageFootprint, SizeBackfiringService
+
+DEFAULT_SQL_LOC_PER_FP = 53.0
+
+
+@dataclass(frozen=True, slots=True)
+class Lab7VariantPreset:
+    project_name: str
+    function_point_project: FunctionPointProject
+    application_composition_project: ApplicationCompositionProject
+    backfiring_project: BackfiringProject
+    early_design_project: EarlyDesignProject | None
+    language_mix_percent: dict[str, int]
+    assumptions: tuple[str, ...]
+
+
+def build_variant_2_preset(
+    cost_per_person_month: float | None = None,
+    sql_loc_per_fp: float | None = None,
+) -> Lab7VariantPreset:
+    effective_sql_loc_per_fp = DEFAULT_SQL_LOC_PER_FP if sql_loc_per_fp is None else sql_loc_per_fp
+
+    function_components = (
+        FunctionPointComponent(
+            name="Авторизация пользователя",
+            component_type=FunctionPointComponentType.EI,
+            det_count=3,
+            reference_count=1,
+            notes="Логин, пароль и флаг запоминания авторизации.",
+        ),
+        FunctionPointComponent(
+            name="Добавление бумаги в биржевые сводки",
+            component_type=FunctionPointComponentType.EI,
+            det_count=2,
+            reference_count=1,
+            notes="Имя бумаги и подтверждение команды.",
+        ),
+        FunctionPointComponent(
+            name="Создание новой заявки",
+            component_type=FunctionPointComponentType.EI,
+            det_count=4,
+            reference_count=2,
+            notes="Имя бумаги, цена, количество, признак покупки/продажи.",
+        ),
+        FunctionPointComponent(
+            name="Изменение существующей заявки",
+            component_type=FunctionPointComponentType.EI,
+            det_count=4,
+            reference_count=2,
+        ),
+        FunctionPointComponent(
+            name="Удаление заявки",
+            component_type=FunctionPointComponentType.EI,
+            det_count=2,
+            reference_count=1,
+        ),
+        FunctionPointComponent(
+            name="Показ биржевых сводок",
+            component_type=FunctionPointComponentType.EO,
+            det_count=4,
+            reference_count=2,
+            notes="Табличный вывод с вычислимым изменением цены.",
+        ),
+        FunctionPointComponent(
+            name="Показ текущих заявок",
+            component_type=FunctionPointComponentType.EQ,
+            det_count=4,
+            reference_count=1,
+        ),
+        FunctionPointComponent(
+            name="История/статус исполнения заявки",
+            component_type=FunctionPointComponentType.EO,
+            det_count=3,
+            reference_count=1,
+        ),
+        FunctionPointComponent(
+            name="Заявки пользователя",
+            component_type=FunctionPointComponentType.ILF,
+            det_count=8,
+            reference_count=1,
+        ),
+        FunctionPointComponent(
+            name="Список отслеживаемых бумаг",
+            component_type=FunctionPointComponentType.ILF,
+            det_count=5,
+            reference_count=1,
+        ),
+        FunctionPointComponent(
+            name="Рыночные данные брокерской системы",
+            component_type=FunctionPointComponentType.EIF,
+            det_count=6,
+            reference_count=1,
+        ),
+    )
+
+    fp_characteristics = build_characteristics(
+        {
+            1: 5,
+            2: 5,
+            3: 3,
+            4: 2,
+            5: 3,
+            6: 4,
+            7: 1,
+            8: 4,
+            9: 4,
+            10: 0,
+            11: 1,
+            12: 2,
+            13: 2,
+            14: 2,
+        }
+    )
+
+    application_items = (
+        ObjectPointItem(
+            name="Экран авторизации",
+            kind=ObjectPointKind.SCREEN,
+            complexity=ObjectPointComplexity.SIMPLE,
+        ),
+        ObjectPointItem(
+            name="Экран биржевых сводок",
+            kind=ObjectPointKind.SCREEN,
+            complexity=ObjectPointComplexity.COMPLEX,
+        ),
+        ObjectPointItem(
+            name="Экран текущих заявок",
+            kind=ObjectPointKind.SCREEN,
+            complexity=ObjectPointComplexity.MEDIUM,
+        ),
+        ObjectPointItem(
+            name="Экран создания заявки",
+            kind=ObjectPointKind.SCREEN,
+            complexity=ObjectPointComplexity.SIMPLE,
+        ),
+        ObjectPointItem(
+            name="Отчет по биржевым сводкам",
+            kind=ObjectPointKind.REPORT,
+            complexity=ObjectPointComplexity.MEDIUM,
+        ),
+        ObjectPointItem(
+            name="Отчет по текущим заявкам",
+            kind=ObjectPointKind.REPORT,
+            complexity=ObjectPointComplexity.MEDIUM,
+        ),
+    )
+
+    scale_factor_ratings = {
+        "PREC": Rating.NOMINAL,
+        "FLEX": Rating.HIGH,
+        "RESL": Rating.LOW,
+        "TEAM": Rating.HIGH,
+        "PMAT": Rating.LOW,
+    }
+
+    effort_multiplier_ratings = {
+        "PERS": Rating.NOMINAL,
+        "RCPX": Rating.VERY_HIGH,
+        "RUSE": Rating.LOW,
+        "PDIF": Rating.HIGH,
+        "PREX": Rating.LOW,
+        "FCIL": Rating.VERY_HIGH,
+        "SCED": Rating.VERY_LOW,
+    }
+
+    assumptions = (
+        "El preset de la variante 2 es editable y representa una primera interpretación trazable de la consigna.",
+        "Para Early Design el tamaño debe pasar por una conversión explícita de FP a KSLOC.",
+        "El material de apoyo local no incluye el coeficiente LOC/FP de SQL; para la versión de entrega se usa por defecto 53 como hipótesis editable.",
+        "Las clasificaciones FP y Object Points deben poder afinarse desde la UI durante la validación final del laboratorio.",
+    )
+
+    function_point_project = FunctionPointProject(
+        components=function_components,
+        characteristics=fp_characteristics,
+    )
+    adjusted_function_points = FunctionPointCalculator().calculate(function_point_project).adjusted_points
+    backfiring_project = BackfiringProject(
+        language_mix=(
+            LanguageFootprint(language="SQL", percentage=15.0, loc_per_fp=effective_sql_loc_per_fp),
+            LanguageFootprint(language="C#", percentage=60.0, loc_per_fp=53.0),
+            LanguageFootprint(language="Java", percentage=25.0, loc_per_fp=53.0),
+        )
+    )
+    backfiring_result = SizeBackfiringService().estimate(adjusted_function_points, backfiring_project)
+    early_design_project = None
+    if backfiring_result.estimated_kloc is not None:
+        early_design_project = EarlyDesignProject(
+            size=backfiring_result.estimated_kloc,
+            scale_factor_ratings=scale_factor_ratings,
+            effort_multiplier_ratings=effort_multiplier_ratings,
+            cost_per_person_month=cost_per_person_month,
+        )
+
+    return Lab7VariantPreset(
+        project_name="Вариант 2: мобильное приложение брокерской системы",
+        function_point_project=function_point_project,
+        application_composition_project=ApplicationCompositionProject(
+            items=application_items,
+            reuse_percent=0.0,
+            productivity_level=ProductivityLevel.NOMINAL,
+        ),
+        backfiring_project=backfiring_project,
+        early_design_project=early_design_project,
+        language_mix_percent={"SQL": 15, "C#": 60, "Java": 25},
+        assumptions=assumptions,
+    )
