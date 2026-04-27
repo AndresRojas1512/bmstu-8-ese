@@ -234,7 +234,7 @@ class FunctionPointTab(QWidget):
         buttons_layout = QHBoxLayout(buttons)
         calculate_button = QPushButton("Рассчитать FP")
         calculate_button.clicked.connect(self.calculate)
-        preset_button = QPushButton("Сбросить к варианту 2")
+        preset_button = QPushButton("Восстановить исходный сценарий")
         preset_button.clicked.connect(lambda: self.load_preset(self._preset))
         export_button = QPushButton("Экспорт CSV")
         export_button.clicked.connect(self._export_csv)
@@ -425,7 +425,9 @@ class ApplicationCompositionTab(QWidget):
 
         self._items = QTableWidget()
         self._reuse_spin = QDoubleSpinBox()
+        self._cost_spin = QDoubleSpinBox()
         self._productivity_combo = QComboBox()
+        self._scale_widget = RatingSelectorWidget(SCALE_FACTOR_DEFINITIONS)
         self._summary = QPlainTextEdit()
         self._results = QTableWidget()
         self._build_ui()
@@ -459,16 +461,24 @@ class ApplicationCompositionTab(QWidget):
         self._reuse_spin.setRange(0.0, 100.0)
         self._reuse_spin.setDecimals(2)
         self._reuse_spin.setSuffix(" %")
+        self._cost_spin.setRange(0.0, 1_000_000_000.0)
+        self._cost_spin.setDecimals(2)
+        self._cost_spin.setSuffix(" за чел.-мес.")
         for level in ProductivityLevel:
             self._productivity_combo.addItem(f"{level.label} ({_format_float(level.productivity, 0)})", level)
         options_form.addRow("Повторное использование", self._reuse_spin)
         options_form.addRow("Продуктивность PROD", self._productivity_combo)
+        options_form.addRow("Стоимость человеко-месяца", self._cost_spin)
+
+        scale_box = QGroupBox("Показатели степени")
+        scale_layout = QVBoxLayout(scale_box)
+        scale_layout.addWidget(self._scale_widget)
 
         buttons = QWidget()
         buttons_layout = QHBoxLayout(buttons)
-        calculate_button = QPushButton("Рассчитать Application Composition")
+        calculate_button = QPushButton("Рассчитать модель композиции приложения")
         calculate_button.clicked.connect(self.calculate)
-        preset_button = QPushButton("Сбросить к варианту 2")
+        preset_button = QPushButton("Восстановить исходный сценарий")
         preset_button.clicked.connect(lambda: self.load_preset(self._preset))
         export_button = QPushButton("Экспорт CSV")
         export_button.clicked.connect(self._export_csv)
@@ -478,6 +488,7 @@ class ApplicationCompositionTab(QWidget):
 
         controls_layout.addWidget(items_box, stretch=3)
         controls_layout.addWidget(options_box)
+        controls_layout.addWidget(scale_box, stretch=2)
         controls_layout.addWidget(buttons)
 
         results = QWidget()
@@ -498,6 +509,12 @@ class ApplicationCompositionTab(QWidget):
     def load_preset(self, preset: Lab7VariantPreset) -> None:
         self._populate_items(preset.application_composition_project.items)
         self._reuse_spin.setValue(preset.application_composition_project.reuse_percent)
+        self._cost_spin.setValue(
+            0.0
+            if preset.application_composition_project.cost_per_person_month is None
+            else preset.application_composition_project.cost_per_person_month
+        )
+        self._scale_widget.set_ratings(preset.application_composition_project.scale_factor_ratings)
         index = self._productivity_combo.findText(
             f"{preset.application_composition_project.productivity_level.label} "
             f"({_format_float(preset.application_composition_project.productivity_level.productivity, 0)})"
@@ -515,7 +532,7 @@ class ApplicationCompositionTab(QWidget):
             self._render(payload)
             return payload
         except ValueError as error:
-            QMessageBox.critical(self, "Ошибка расчета Object Points", str(error))
+            QMessageBox.critical(self, "Ошибка расчета объектных точек", str(error))
             return None
 
     def current_payload(self) -> ApplicationCompositionPayload | None:
@@ -557,6 +574,8 @@ class ApplicationCompositionTab(QWidget):
             items=tuple(items),
             reuse_percent=self._reuse_spin.value(),
             productivity_level=productivity,
+            scale_factor_ratings=self._scale_widget.ratings(),
+            cost_per_person_month=self._cost_spin.value() or None,
         )
 
     def _render(self, payload: ApplicationCompositionPayload) -> None:
@@ -565,10 +584,15 @@ class ApplicationCompositionTab(QWidget):
             "\n".join(
                 [
                     f"Количество элементов: {len(payload.project.items)}",
-                    f"Object Points: {_format_float(result.object_points)}",
-                    f"Новые Object Points (NOP): {_format_float(result.new_object_points)}",
+                    f"Объектные точки: {_format_float(result.object_points)}",
+                    f"Новые объектные точки (NOP): {_format_float(result.new_object_points)}",
+                    f"Показатель степени p: {_format_float(result.exponent, 4)}",
                     f"PROD: {_format_float(payload.project.productivity_level.productivity, 0)}",
                     f"Трудоемкость модели композиции (PM): {_format_float(result.effort_person_months)}",
+                    f"Срок модели композиции (мес.): {_format_float(result.time_months)}",
+                    f"Средний размер команды: {_format_float(result.average_team_size)}",
+                    "Предварительный бюджет: "
+                    + ("не задан" if result.budget is None else _format_float(result.budget)),
                 ]
             )
         )
@@ -638,7 +662,10 @@ class ApplicationCompositionTab(QWidget):
         payload = self.calculate()
         if payload is None:
             return
-        directory = QFileDialog.getExistingDirectory(self, "Выберите каталог для экспорта Object Points")
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Выберите каталог для экспорта модели композиции приложения",
+        )
         if not directory:
             return
         exported = self._export_service.export_application_composition(
@@ -760,9 +787,9 @@ class EarlyDesignTab(QWidget):
 
         buttons = QWidget()
         buttons_layout = QHBoxLayout(buttons)
-        calculate_button = QPushButton("Рассчитать Early Design")
+        calculate_button = QPushButton("Рассчитать модель ранней разработки архитектуры")
         calculate_button.clicked.connect(self.calculate)
-        preset_button = QPushButton("Сбросить к варианту 2")
+        preset_button = QPushButton("Восстановить исходный сценарий")
         preset_button.clicked.connect(lambda: self.load_preset(self._preset))
         export_button = QPushButton("Экспорт CSV")
         export_button.clicked.connect(self._export_csv)
@@ -778,7 +805,7 @@ class EarlyDesignTab(QWidget):
         results = QWidget()
         results_layout = QVBoxLayout(results)
         self._summary.setReadOnly(True)
-        self._summary.setPlaceholderText("Здесь появится сводка по Early Design.")
+        self._summary.setPlaceholderText("Здесь появится сводка по модели ранней разработки архитектуры.")
         self._backfiring_table.setColumnCount(4)
         self._backfiring_table.setHorizontalHeaderLabels(["Язык", "Доля, %", "LOC / FP", "Вклад, KLOC"])
         self._backfiring_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -855,7 +882,7 @@ class EarlyDesignTab(QWidget):
             self._render(payload)
             return payload
         except ValueError as error:
-            QMessageBox.critical(self, "Ошибка расчета Early Design", str(error))
+            QMessageBox.critical(self, "Ошибка расчета модели ранней разработки архитектуры", str(error))
             return None
 
     def current_payload(self) -> EarlyDesignPayload | None:
@@ -899,7 +926,7 @@ class EarlyDesignTab(QWidget):
         if backfiring.estimated_kloc is None or payload.early_design_result is None or payload.early_design_project is None:
             lines.extend(
                 [
-                    "Полный расчет Early Design пока не завершен.",
+                    "Полный расчет модели ранней разработки архитектуры пока не завершен.",
                     "Нужно задать LOC/FP для всех языков смеси, включая SQL.",
                 ]
             )
@@ -974,7 +1001,10 @@ class EarlyDesignTab(QWidget):
         payload = self.calculate()
         if payload is None:
             return
-        directory = QFileDialog.getExistingDirectory(self, "Выберите каталог для экспорта Early Design")
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Выберите каталог для экспорта модели ранней разработки архитектуры",
+        )
         if not directory:
             return
         exported = self._export_service.export_early_design(directory, payload, "early_design")
@@ -1026,18 +1056,26 @@ class SummaryTab(QWidget):
         app_payload = self._application_tab.calculate()
         early_payload = self._early_tab.calculate()
 
-        lines = ["Вариант 2: мобильное приложение брокерской системы", ""]
+        lines = ["Мобильное приложение брокерской системы", ""]
         if fp_payload is not None:
             lines.append(f"FP: {_format_float(fp_payload.result.adjusted_points)}")
         if app_payload is not None:
-            lines.append(f"Object Points: {_format_float(app_payload.result.object_points)}")
-            lines.append(f"Application Composition PM: {_format_float(app_payload.result.effort_person_months)}")
+            lines.append(f"Объектные точки: {_format_float(app_payload.result.object_points)}")
+            lines.append(
+                f"Трудоемкость по модели композиции приложения: {_format_float(app_payload.result.effort_person_months)}"
+            )
+            lines.append(f"Срок по модели композиции приложения: {_format_float(app_payload.result.time_months)}")
+            lines.append(
+                f"Средний размер команды по модели композиции приложения: {_format_float(app_payload.result.average_team_size)}"
+            )
+            if app_payload.result.budget is not None:
+                lines.append(f"Бюджет по модели композиции приложения: {_format_float(app_payload.result.budget)}")
         if early_payload is not None:
             lines.append(
                 f"Backfiring covered share: {_format_float(early_payload.backfiring_result.known_share_percent, 0)} %"
             )
             if early_payload.early_design_result is None:
-                lines.append("Early Design: ожидает полного набора LOC/FP по языкам.")
+                lines.append("Модель ранней разработки архитектуры: ожидает полного набора LOC/FP по языкам.")
             else:
                 sql_item = next(
                     (item for item in early_payload.backfiring_project.language_mix if item.language.upper() == "SQL"),
@@ -1045,18 +1083,24 @@ class SummaryTab(QWidget):
                 )
                 if sql_item is not None and sql_item.loc_per_fp is not None:
                     lines.append(f"SQL LOC/FP: {_format_float(sql_item.loc_per_fp, 0)}")
-                lines.append(f"Early Design KLOC: {_format_float(early_payload.early_design_project.size, 3)}")
-                lines.append(f"Early Design PM: {_format_float(early_payload.early_design_result.effort_person_months)}")
-                lines.append(f"Early Design TDEV: {_format_float(early_payload.early_design_result.time_months)}")
+                lines.append(
+                    f"KLOC для модели ранней разработки архитектуры: {_format_float(early_payload.early_design_project.size, 3)}"
+                )
+                lines.append(
+                    f"Трудоемкость по модели ранней разработки архитектуры: {_format_float(early_payload.early_design_result.effort_person_months)}"
+                )
+                lines.append(
+                    f"Срок по модели ранней разработки архитектуры: {_format_float(early_payload.early_design_result.time_months)}"
+                )
                 lines.append(f"Средний размер команды: {_format_float(early_payload.early_design_result.average_team_size)}")
         self._summary.setPlainText("\n".join(lines))
 
         assumptions = [
-            "1. FP и Object Points предзаполнены по трактовке варианта 2, но остаются редактируемыми.",
-            "2. Early Design использует размер, рассчитанный через backfiring FP -> KLOC.",
+            "1. FP и объектные точки предзаполнены для исходного сценария брокерского мобильного приложения, но остаются редактируемыми.",
+            "2. Модель ранней разработки архитектуры использует размер, рассчитанный через backfiring FP -> KLOC.",
             "3. Для SQL по умолчанию используется LOC/FP = 53 как явное и редактируемое экспертное допущение.",
-            "4. Если пользователь очищает LOC/FP хотя бы для одного языка смеси, Early Design не закрывается автоматически.",
-            "5. Значения scale factors и effort multipliers взяты из текстового описания варианта 2.",
+            "4. Если пользователь очищает LOC/FP хотя бы для одного языка смеси, модель ранней разработки архитектуры не закрывается автоматически.",
+            "5. Значения scale factors и effort multipliers взяты из текстового описания исходного сценария.",
         ]
         self._assumptions.setPlainText("\n".join(assumptions))
 
@@ -1104,8 +1148,8 @@ class MainWindow(QMainWindow):
         self._summary_tab = SummaryTab(self._fp_tab, self._application_tab, self._early_tab, exporter)
 
         tabs.addTab(self._fp_tab, "Функциональные точки")
-        tabs.addTab(self._application_tab, "Композиция приложения")
-        tabs.addTab(self._early_tab, "Ранняя архитектура")
+        tabs.addTab(self._application_tab, "Модель композиции приложения")
+        tabs.addTab(self._early_tab, "Модель ранней разработки архитектуры")
         tabs.addTab(self._summary_tab, "Сводка")
         self.setCentralWidget(tabs)
 

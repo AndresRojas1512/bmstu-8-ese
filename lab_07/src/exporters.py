@@ -110,7 +110,11 @@ class CsvExportService:
                 ("PROD", f"{project.productivity_level.productivity:.2f}"),
                 ("Object Points", f"{result.object_points:.2f}"),
                 ("NOP", f"{result.new_object_points:.2f}"),
+                ("Exponent p", f"{result.exponent:.4f}"),
                 ("Effort PM", f"{result.effort_person_months:.2f}"),
+                ("TDEV", f"{result.time_months:.2f}"),
+                ("Average team", f"{result.average_team_size:.2f}"),
+                ("Budget", "" if result.budget is None else f"{result.budget:.2f}"),
             ],
         )
         self._write_csv(

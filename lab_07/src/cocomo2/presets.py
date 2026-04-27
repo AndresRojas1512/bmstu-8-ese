@@ -183,7 +183,7 @@ def build_variant_2_preset(
     }
 
     assumptions = (
-        "El preset de la variante 2 es editable y representa una primera interpretación trazable de la consigna.",
+        "El escenario inicial es editable y representa una primera interpretación trazable de la consigna.",
         "Para Early Design el tamaño debe pasar por una conversión explícita de FP a KSLOC.",
         "El material de apoyo local no incluye el coeficiente LOC/FP de SQL; para la versión de entrega se usa por defecto 53 como hipótesis editable.",
         "Las clasificaciones FP y Object Points deben poder afinarse desde la UI durante la validación final del laboratorio.",
@@ -212,12 +212,14 @@ def build_variant_2_preset(
         )
 
     return Lab7VariantPreset(
-        project_name="Вариант 2: мобильное приложение брокерской системы",
+        project_name="Мобильное приложение брокерской системы",
         function_point_project=function_point_project,
         application_composition_project=ApplicationCompositionProject(
             items=application_items,
             reuse_percent=0.0,
             productivity_level=ProductivityLevel.NOMINAL,
+            scale_factor_ratings=scale_factor_ratings,
+            cost_per_person_month=cost_per_person_month,
         ),
         backfiring_project=backfiring_project,
         early_design_project=early_design_project,

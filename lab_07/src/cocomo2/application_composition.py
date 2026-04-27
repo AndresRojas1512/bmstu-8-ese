@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from .enums import Rating
+from .early_design import SCALE_FACTOR_DEFINITIONS
+
 
 class ObjectPointKind(Enum):
     SCREEN = "Экран"
@@ -54,6 +57,8 @@ class ApplicationCompositionProject:
     items: tuple[ObjectPointItem, ...]
     reuse_percent: float
     productivity_level: ProductivityLevel
+    scale_factor_ratings: dict[str, Rating]
+    cost_per_person_month: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,7 +73,11 @@ class ApplicationCompositionResult:
     rated_items: tuple[RatedObjectPointItem, ...]
     object_points: float
     new_object_points: float
+    exponent: float
     effort_person_months: float
+    time_months: float
+    average_team_size: float
+    budget: float | None
 
 
 _SCREEN_WEIGHTS: dict[ObjectPointComplexity, int] = {
@@ -91,13 +100,25 @@ class ApplicationCompositionCalculator:
         rated_items = tuple(self._rate_item(item) for item in project.items)
         object_points = float(sum(item.points for item in rated_items))
         new_object_points = object_points * (100.0 - project.reuse_percent) / 100.0
+        scale_factor_sum = 0.0
+        for definition in SCALE_FACTOR_DEFINITIONS:
+            scale_factor_sum += definition.value_for(project.scale_factor_ratings[definition.identifier])
+        exponent = 1.01 + 0.01 * scale_factor_sum
         effort_person_months = new_object_points / project.productivity_level.productivity
+        schedule_exponent = 0.33 + 0.2 * (exponent - 1.01)
+        time_months = 3.0 * (effort_person_months ** schedule_exponent)
+        average_team_size = effort_person_months / time_months
+        budget = None if project.cost_per_person_month is None else effort_person_months * project.cost_per_person_month
 
         return ApplicationCompositionResult(
             rated_items=rated_items,
             object_points=object_points,
             new_object_points=new_object_points,
+            exponent=exponent,
             effort_person_months=effort_person_months,
+            time_months=time_months,
+            average_team_size=average_team_size,
+            budget=budget,
         )
 
     def _rate_item(self, item: ObjectPointItem) -> RatedObjectPointItem:
@@ -122,6 +143,10 @@ class ApplicationCompositionCalculator:
             raise ValueError("At least one object point item is required.")
         if project.reuse_percent < 0 or project.reuse_percent > 100:
             raise ValueError("Reuse percent must be between 0 and 100.")
+        if set(project.scale_factor_ratings) != {definition.identifier for definition in SCALE_FACTOR_DEFINITIONS}:
+            raise ValueError("All five scale factors must be provided.")
+        if project.cost_per_person_month is not None and project.cost_per_person_month < 0:
+            raise ValueError("Cost per person-month cannot be negative.")
 
         for item in project.items:
             if item.count <= 0:
