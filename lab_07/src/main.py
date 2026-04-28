@@ -9,13 +9,13 @@ if __package__ in {None, ""}:
         ApplicationCompositionCalculator,
         ApplicationCompositionProject,
         ApplicationCompositionResult,
-        BackfiringProject,
-        BackfiringResult,
-        EFFORT_MULTIPLIER_DEFINITIONS,
+        EFFORT_COEFFICIENT_DEFINITIONS,
         EarlyDesignCalculator,
         EarlyDesignProject,
         EarlyDesignResult,
+        EXPONENT_FACTOR_DEFINITIONS,
         FUNCTION_POINT_CHARACTERISTICS,
+        FunctionPointConversionService,
         FunctionPointCalculator,
         FunctionPointComponent,
         FunctionPointComponentType,
@@ -28,8 +28,8 @@ if __package__ in {None, ""}:
         ObjectPointKind,
         ProductivityLevel,
         Rating,
-        SCALE_FACTOR_DEFINITIONS,
-        SizeBackfiringService,
+        SizeConversionProject,
+        SizeConversionResult,
         build_characteristics,
         build_variant_2_preset,
     )
@@ -63,13 +63,13 @@ else:
         ApplicationCompositionCalculator,
         ApplicationCompositionProject,
         ApplicationCompositionResult,
-        BackfiringProject,
-        BackfiringResult,
-        EFFORT_MULTIPLIER_DEFINITIONS,
+        EFFORT_COEFFICIENT_DEFINITIONS,
         EarlyDesignCalculator,
         EarlyDesignProject,
         EarlyDesignResult,
+        EXPONENT_FACTOR_DEFINITIONS,
         FUNCTION_POINT_CHARACTERISTICS,
+        FunctionPointConversionService,
         FunctionPointCalculator,
         FunctionPointComponent,
         FunctionPointComponentType,
@@ -82,8 +82,8 @@ else:
         ObjectPointKind,
         ProductivityLevel,
         Rating,
-        SCALE_FACTOR_DEFINITIONS,
-        SizeBackfiringService,
+        SizeConversionProject,
+        SizeConversionResult,
         build_characteristics,
         build_variant_2_preset,
     )
@@ -174,8 +174,8 @@ class ApplicationCompositionPayload:
 @dataclass(frozen=True, slots=True)
 class EarlyDesignPayload:
     function_point_result: FunctionPointResult
-    backfiring_project: BackfiringProject
-    backfiring_result: BackfiringResult
+    size_conversion_project: SizeConversionProject
+    size_conversion_result: SizeConversionResult
     early_design_project: EarlyDesignProject | None
     early_design_result: EarlyDesignResult | None
 
@@ -232,7 +232,7 @@ class FunctionPointTab(QWidget):
 
         buttons = QWidget()
         buttons_layout = QHBoxLayout(buttons)
-        calculate_button = QPushButton("Рассчитать FP")
+        calculate_button = QPushButton("Рассчитать функциональные точки")
         calculate_button.clicked.connect(self.calculate)
         preset_button = QPushButton("Восстановить исходный сценарий")
         preset_button.clicked.connect(lambda: self.load_preset(self._preset))
@@ -279,7 +279,7 @@ class FunctionPointTab(QWidget):
             self._render(payload)
             return payload
         except ValueError as error:
-            QMessageBox.critical(self, "Ошибка расчета FP", str(error))
+            QMessageBox.critical(self, "Ошибка расчета функциональных точек", str(error))
             return None
 
     def current_payload(self) -> FunctionPointPayload | None:
@@ -317,7 +317,7 @@ class FunctionPointTab(QWidget):
             identifier_item = self._characteristics.item(row, 0)
             spin = self._characteristics.cellWidget(row, 2)
             if identifier_item is None or not isinstance(spin, QSpinBox):
-                raise ValueError("Не удалось прочитать системные параметры FP.")
+                raise ValueError("Не удалось прочитать системные параметры функциональных точек.")
             values[int(identifier_item.text())] = spin.value()
 
         return FunctionPointProject(components=tuple(components), characteristics=build_characteristics(values))
@@ -402,7 +402,7 @@ class FunctionPointTab(QWidget):
         payload = self.calculate()
         if payload is None:
             return
-        directory = QFileDialog.getExistingDirectory(self, "Выберите каталог для экспорта FP")
+        directory = QFileDialog.getExistingDirectory(self, "Выберите каталог для экспорта расчета функциональных точек")
         if not directory:
             return
         exported = self._export_service.export_function_points(directory, payload.project, payload.result, "function_points")
@@ -427,7 +427,7 @@ class ApplicationCompositionTab(QWidget):
         self._reuse_spin = QDoubleSpinBox()
         self._cost_spin = QDoubleSpinBox()
         self._productivity_combo = QComboBox()
-        self._scale_widget = RatingSelectorWidget(SCALE_FACTOR_DEFINITIONS)
+        self._exponent_factor_widget = RatingSelectorWidget(EXPONENT_FACTOR_DEFINITIONS)
         self._summary = QPlainTextEdit()
         self._results = QTableWidget()
         self._build_ui()
@@ -467,12 +467,12 @@ class ApplicationCompositionTab(QWidget):
         for level in ProductivityLevel:
             self._productivity_combo.addItem(f"{level.label} ({_format_float(level.productivity, 0)})", level)
         options_form.addRow("Повторное использование", self._reuse_spin)
-        options_form.addRow("Продуктивность PROD", self._productivity_combo)
+        options_form.addRow("Продуктивность (PROD)", self._productivity_combo)
         options_form.addRow("Стоимость человеко-месяца", self._cost_spin)
 
-        scale_box = QGroupBox("Показатели степени")
-        scale_layout = QVBoxLayout(scale_box)
-        scale_layout.addWidget(self._scale_widget)
+        exponent_box = QGroupBox("Показатели степени")
+        exponent_layout = QVBoxLayout(exponent_box)
+        exponent_layout.addWidget(self._exponent_factor_widget)
 
         buttons = QWidget()
         buttons_layout = QHBoxLayout(buttons)
@@ -488,7 +488,7 @@ class ApplicationCompositionTab(QWidget):
 
         controls_layout.addWidget(items_box, stretch=3)
         controls_layout.addWidget(options_box)
-        controls_layout.addWidget(scale_box, stretch=2)
+        controls_layout.addWidget(exponent_box, stretch=2)
         controls_layout.addWidget(buttons)
 
         results = QWidget()
@@ -514,7 +514,7 @@ class ApplicationCompositionTab(QWidget):
             if preset.application_composition_project.cost_per_person_month is None
             else preset.application_composition_project.cost_per_person_month
         )
-        self._scale_widget.set_ratings(preset.application_composition_project.scale_factor_ratings)
+        self._exponent_factor_widget.set_ratings(preset.application_composition_project.exponent_factor_ratings)
         index = self._productivity_combo.findText(
             f"{preset.application_composition_project.productivity_level.label} "
             f"({_format_float(preset.application_composition_project.productivity_level.productivity, 0)})"
@@ -574,7 +574,7 @@ class ApplicationCompositionTab(QWidget):
             items=tuple(items),
             reuse_percent=self._reuse_spin.value(),
             productivity_level=productivity,
-            scale_factor_ratings=self._scale_widget.ratings(),
+            exponent_factor_ratings=self._exponent_factor_widget.ratings(),
             cost_per_person_month=self._cost_spin.value() or None,
         )
 
@@ -587,7 +587,7 @@ class ApplicationCompositionTab(QWidget):
                     f"Объектные точки: {_format_float(result.object_points)}",
                     f"Новые объектные точки (NOP): {_format_float(result.new_object_points)}",
                     f"Показатель степени p: {_format_float(result.exponent, 4)}",
-                    f"PROD: {_format_float(payload.project.productivity_level.productivity, 0)}",
+                    f"Продуктивность (PROD): {_format_float(payload.project.productivity_level.productivity, 0)}",
                     f"Трудоемкость модели композиции (PM): {_format_float(result.effort_person_months)}",
                     f"Срок модели композиции (мес.): {_format_float(result.time_months)}",
                     f"Средний размер команды: {_format_float(result.average_team_size)}",
@@ -728,24 +728,24 @@ class EarlyDesignTab(QWidget):
         self,
         fp_tab: FunctionPointTab,
         calculator: EarlyDesignCalculator,
-        backfiring_service: SizeBackfiringService,
+        size_conversion_service: FunctionPointConversionService,
         preset: Lab7VariantPreset,
         export_service: CsvExportService,
     ) -> None:
         super().__init__()
         self._fp_tab = fp_tab
         self._calculator = calculator
-        self._backfiring_service = backfiring_service
+        self._size_conversion_service = size_conversion_service
         self._preset = preset
         self._export_service = export_service
         self._payload: EarlyDesignPayload | None = None
 
         self._cost_spin = QDoubleSpinBox()
         self._languages = QTableWidget()
-        self._scale_widget = RatingSelectorWidget(SCALE_FACTOR_DEFINITIONS)
-        self._multiplier_widget = RatingSelectorWidget(EFFORT_MULTIPLIER_DEFINITIONS)
+        self._exponent_factor_widget = RatingSelectorWidget(EXPONENT_FACTOR_DEFINITIONS)
+        self._effort_coefficients_widget = RatingSelectorWidget(EFFORT_COEFFICIENT_DEFINITIONS)
         self._summary = QPlainTextEdit()
-        self._backfiring_table = QTableWidget()
+        self._size_conversion_table = QTableWidget()
         self._factors_table = QTableWidget()
         self._build_ui()
         self.load_preset(preset)
@@ -762,7 +762,7 @@ class EarlyDesignTab(QWidget):
         self._cost_spin.setDecimals(2)
         self._cost_spin.setSuffix(" за чел.-мес.")
         self._languages.setColumnCount(3)
-        self._languages.setHorizontalHeaderLabels(["Язык", "Доля, %", "LOC / FP"])
+        self._languages.setHorizontalHeaderLabels(["Язык", "Доля, %", "LOC/FP"])
         self._languages.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         sizing_form.addRow("Стоимость человеко-месяца", self._cost_spin)
         sizing_form.addRow(self._languages)
@@ -777,13 +777,13 @@ class EarlyDesignTab(QWidget):
         language_buttons_layout.addWidget(remove_language_button)
         sizing_form.addRow(language_buttons)
 
-        scale_box = QGroupBox("Показатели степени")
-        scale_layout = QVBoxLayout(scale_box)
-        scale_layout.addWidget(self._scale_widget)
+        exponent_box = QGroupBox("Показатели степени")
+        exponent_layout = QVBoxLayout(exponent_box)
+        exponent_layout.addWidget(self._exponent_factor_widget)
 
-        multiplier_box = QGroupBox("Множители трудоемкости")
-        multiplier_layout = QVBoxLayout(multiplier_box)
-        multiplier_layout.addWidget(self._multiplier_widget)
+        effort_coefficients_box = QGroupBox("Коэффициенты трудоемкости")
+        effort_coefficients_layout = QVBoxLayout(effort_coefficients_box)
+        effort_coefficients_layout.addWidget(self._effort_coefficients_widget)
 
         buttons = QWidget()
         buttons_layout = QHBoxLayout(buttons)
@@ -798,25 +798,25 @@ class EarlyDesignTab(QWidget):
         buttons_layout.addWidget(export_button)
 
         controls_layout.addWidget(sizing_box)
-        controls_layout.addWidget(scale_box, stretch=1)
-        controls_layout.addWidget(multiplier_box, stretch=1)
+        controls_layout.addWidget(exponent_box, stretch=1)
+        controls_layout.addWidget(effort_coefficients_box, stretch=1)
         controls_layout.addWidget(buttons)
 
         results = QWidget()
         results_layout = QVBoxLayout(results)
         self._summary.setReadOnly(True)
         self._summary.setPlaceholderText("Здесь появится сводка по модели ранней разработки архитектуры.")
-        self._backfiring_table.setColumnCount(4)
-        self._backfiring_table.setHorizontalHeaderLabels(["Язык", "Доля, %", "LOC / FP", "Вклад, KLOC"])
-        self._backfiring_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self._size_conversion_table.setColumnCount(4)
+        self._size_conversion_table.setHorizontalHeaderLabels(["Язык", "Доля, %", "LOC/FP", "Вклад, KLOC"])
+        self._size_conversion_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self._factors_table.setColumnCount(4)
         self._factors_table.setHorizontalHeaderLabels(["Группа", "ID", "Уровень", "Значение"])
         self._factors_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
 
         results_layout.addWidget(QLabel("Сводка"))
         results_layout.addWidget(self._summary)
-        results_layout.addWidget(QLabel("Backfiring FP -> KLOC"))
-        results_layout.addWidget(self._backfiring_table)
+        results_layout.addWidget(QLabel("Пересчет функциональных точек в KLOC"))
+        results_layout.addWidget(self._size_conversion_table)
         results_layout.addWidget(QLabel("Использованные факторы"))
         results_layout.addWidget(self._factors_table)
 
@@ -825,20 +825,20 @@ class EarlyDesignTab(QWidget):
 
     def load_preset(self, preset: Lab7VariantPreset) -> None:
         self._cost_spin.setValue(0.0 if preset.early_design_project is None or preset.early_design_project.cost_per_person_month is None else preset.early_design_project.cost_per_person_month)
-        self._populate_languages(preset.backfiring_project.language_mix)
+        self._populate_languages(preset.size_conversion_project.language_mix)
         reference_project = preset.early_design_project
         if reference_project is None:
             # Use explicit ratings from the documented variant even if size is unresolved.
             reference_project = EarlyDesignProject(
                 size=1.0,
-                scale_factor_ratings={
+                exponent_factor_ratings={
                     "PREC": Rating.NOMINAL,
                     "FLEX": Rating.HIGH,
                     "RESL": Rating.LOW,
                     "TEAM": Rating.HIGH,
                     "PMAT": Rating.LOW,
                 },
-                effort_multiplier_ratings={
+                effort_coefficient_ratings={
                     "PERS": Rating.NOMINAL,
                     "RCPX": Rating.VERY_HIGH,
                     "RUSE": Rating.LOW,
@@ -848,8 +848,8 @@ class EarlyDesignTab(QWidget):
                     "SCED": Rating.VERY_LOW,
                 },
             )
-        self._scale_widget.set_ratings(reference_project.scale_factor_ratings)
-        self._multiplier_widget.set_ratings(reference_project.effort_multiplier_ratings)
+        self._exponent_factor_widget.set_ratings(reference_project.exponent_factor_ratings)
+        self._effort_coefficients_widget.set_ratings(reference_project.effort_coefficient_ratings)
         self.calculate()
 
     def calculate(self) -> EarlyDesignPayload | None:
@@ -857,24 +857,27 @@ class EarlyDesignTab(QWidget):
             fp_payload = self._fp_tab.calculate()
             if fp_payload is None:
                 raise ValueError("Сначала нужен корректный расчет функциональных точек.")
-            backfiring_project = self._build_backfiring_project()
-            backfiring_result = self._backfiring_service.estimate(fp_payload.result.adjusted_points, backfiring_project)
+            size_conversion_project = self._build_size_conversion_project()
+            size_conversion_result = self._size_conversion_service.estimate(
+                fp_payload.result.adjusted_points,
+                size_conversion_project,
+            )
 
             early_project: EarlyDesignProject | None = None
             early_result: EarlyDesignResult | None = None
-            if backfiring_result.estimated_kloc is not None:
+            if size_conversion_result.estimated_kloc is not None:
                 early_project = EarlyDesignProject(
-                    size=backfiring_result.estimated_kloc,
-                    scale_factor_ratings=self._scale_widget.ratings(),
-                    effort_multiplier_ratings=self._multiplier_widget.ratings(),
+                    size=size_conversion_result.estimated_kloc,
+                    exponent_factor_ratings=self._exponent_factor_widget.ratings(),
+                    effort_coefficient_ratings=self._effort_coefficients_widget.ratings(),
                     cost_per_person_month=self._cost_spin.value() or None,
                 )
                 early_result = self._calculator.estimate(early_project)
 
             payload = EarlyDesignPayload(
                 function_point_result=fp_payload.result,
-                backfiring_project=backfiring_project,
-                backfiring_result=backfiring_result,
+                size_conversion_project=size_conversion_project,
+                size_conversion_result=size_conversion_result,
                 early_design_project=early_project,
                 early_design_result=early_result,
             )
@@ -888,7 +891,7 @@ class EarlyDesignTab(QWidget):
     def current_payload(self) -> EarlyDesignPayload | None:
         return self._payload
 
-    def _build_backfiring_project(self) -> BackfiringProject:
+    def _build_size_conversion_project(self) -> SizeConversionProject:
         items: list[LanguageFootprint] = []
         for row in range(self._languages.rowCount()):
             language_item = self._languages.item(row, 0)
@@ -903,7 +906,7 @@ class EarlyDesignTab(QWidget):
             if not loc_text:
                 loc_per_fp = None
             else:
-                loc_per_fp = _parse_float(loc_text, row=row + 1, field="LOC / FP", minimum=0.0, strict_min=True)
+                loc_per_fp = _parse_float(loc_text, row=row + 1, field="LOC/FP", minimum=0.0, strict_min=True)
             items.append(
                 LanguageFootprint(
                     language=language_name,
@@ -911,19 +914,19 @@ class EarlyDesignTab(QWidget):
                     loc_per_fp=loc_per_fp,
                 )
             )
-        return BackfiringProject(language_mix=tuple(items))
+        return SizeConversionProject(language_mix=tuple(items))
 
     def _render(self, payload: EarlyDesignPayload) -> None:
-        backfiring = payload.backfiring_result
+        size_conversion = payload.size_conversion_result
         lines = [
-            f"FP из вкладки Function Point: {_format_float(payload.function_point_result.adjusted_points)}",
-            f"Покрытая доля backfiring: {_format_float(backfiring.known_share_percent, 0)} %",
-            f"Частичный размер по известной доле: {_format_float(backfiring.partial_kloc_from_known_share, 3)} KLOC",
+            f"Функциональные точки: {_format_float(payload.function_point_result.adjusted_points)}",
+            f"Покрытая доля пересчета: {_format_float(size_conversion.known_share_percent, 0)} %",
+            f"Частичный размер по известной доле: {_format_float(size_conversion.partial_kloc_from_known_share, 3)} KLOC",
         ]
-        sql_item = next((item for item in payload.backfiring_project.language_mix if item.language.upper() == "SQL"), None)
+        sql_item = next((item for item in payload.size_conversion_project.language_mix if item.language.upper() == "SQL"), None)
         if sql_item is not None and sql_item.loc_per_fp is not None:
-            lines.append(f"Принятое значение SQL LOC/FP: {_format_float(sql_item.loc_per_fp, 0)}")
-        if backfiring.estimated_kloc is None or payload.early_design_result is None or payload.early_design_project is None:
+            lines.append(f"Принятое значение LOC/FP для SQL: {_format_float(sql_item.loc_per_fp, 0)}")
+        if size_conversion.estimated_kloc is None or payload.early_design_result is None or payload.early_design_project is None:
             lines.extend(
                 [
                     "Полный расчет модели ранней разработки архитектуры пока не завершен.",
@@ -936,7 +939,7 @@ class EarlyDesignTab(QWidget):
                 [
                     f"Полный размер: {_format_float(payload.early_design_project.size, 3)} KLOC",
                     f"Показатель степени p: {_format_float(result.exponent, 4)}",
-                    f"EArch: {_format_float(result.effort_adjustment_factor, 4)}",
+                    f"EArch: {_format_float(result.effort_coefficient_product, 4)}",
                     f"Трудоемкость (PM): {_format_float(result.effort_person_months)}",
                     f"Срок разработки (мес.): {_format_float(result.time_months)}",
                     f"Средняя численность команды: {_format_float(result.average_team_size)}",
@@ -946,8 +949,8 @@ class EarlyDesignTab(QWidget):
             )
         self._summary.setPlainText("\n".join(lines))
 
-        self._backfiring_table.setRowCount(len(payload.backfiring_project.language_mix))
-        for row, item in enumerate(payload.backfiring_project.language_mix):
+        self._size_conversion_table.setRowCount(len(payload.size_conversion_project.language_mix))
+        for row, item in enumerate(payload.size_conversion_project.language_mix):
             contribution = 0.0 if item.loc_per_fp is None else payload.function_point_result.adjusted_points * item.percentage * item.loc_per_fp / 100000.0
             values = [
                 item.language,
@@ -956,17 +959,17 @@ class EarlyDesignTab(QWidget):
                 _format_float(contribution, 3),
             ]
             for column, value in enumerate(values):
-                self._backfiring_table.setItem(row, column, QTableWidgetItem(value))
-        self._backfiring_table.resizeColumnsToContents()
+                self._size_conversion_table.setItem(row, column, QTableWidgetItem(value))
+        self._size_conversion_table.resizeColumnsToContents()
 
         factor_rows = []
-        for definition in SCALE_FACTOR_DEFINITIONS:
-            rating = self._scale_widget.ratings()[definition.identifier]
-            factor_rows.append(("Scale", definition.identifier, rating.label, _format_float(definition.value_for(rating), 2)))
-        for definition in EFFORT_MULTIPLIER_DEFINITIONS:
-            rating = self._multiplier_widget.ratings()[definition.identifier]
+        for definition in EXPONENT_FACTOR_DEFINITIONS:
+            rating = self._exponent_factor_widget.ratings()[definition.identifier]
+            factor_rows.append(("Показатель степени", definition.identifier, rating.label, _format_float(definition.value_for(rating), 2)))
+        for definition in EFFORT_COEFFICIENT_DEFINITIONS:
+            rating = self._effort_coefficients_widget.ratings()[definition.identifier]
             factor_rows.append(
-                ("Multiplier", definition.identifier, rating.label, _format_float(definition.value_for(rating), 2))
+                ("Коэффициент трудоемкости", definition.identifier, rating.label, _format_float(definition.value_for(rating), 2))
             )
 
         self._factors_table.setRowCount(len(factor_rows))
@@ -1058,7 +1061,7 @@ class SummaryTab(QWidget):
 
         lines = ["Мобильное приложение брокерской системы", ""]
         if fp_payload is not None:
-            lines.append(f"FP: {_format_float(fp_payload.result.adjusted_points)}")
+            lines.append(f"Функциональные точки: {_format_float(fp_payload.result.adjusted_points)}")
         if app_payload is not None:
             lines.append(f"Объектные точки: {_format_float(app_payload.result.object_points)}")
             lines.append(
@@ -1072,17 +1075,17 @@ class SummaryTab(QWidget):
                 lines.append(f"Бюджет по модели композиции приложения: {_format_float(app_payload.result.budget)}")
         if early_payload is not None:
             lines.append(
-                f"Backfiring covered share: {_format_float(early_payload.backfiring_result.known_share_percent, 0)} %"
+                f"Покрытая доля пересчета: {_format_float(early_payload.size_conversion_result.known_share_percent, 0)} %"
             )
             if early_payload.early_design_result is None:
                 lines.append("Модель ранней разработки архитектуры: ожидает полного набора LOC/FP по языкам.")
             else:
                 sql_item = next(
-                    (item for item in early_payload.backfiring_project.language_mix if item.language.upper() == "SQL"),
+                    (item for item in early_payload.size_conversion_project.language_mix if item.language.upper() == "SQL"),
                     None,
                 )
                 if sql_item is not None and sql_item.loc_per_fp is not None:
-                    lines.append(f"SQL LOC/FP: {_format_float(sql_item.loc_per_fp, 0)}")
+                    lines.append(f"LOC/FP для SQL: {_format_float(sql_item.loc_per_fp, 0)}")
                 lines.append(
                     f"KLOC для модели ранней разработки архитектуры: {_format_float(early_payload.early_design_project.size, 3)}"
                 )
@@ -1096,11 +1099,11 @@ class SummaryTab(QWidget):
         self._summary.setPlainText("\n".join(lines))
 
         assumptions = [
-            "1. FP и объектные точки предзаполнены для исходного сценария брокерского мобильного приложения, но остаются редактируемыми.",
-            "2. Модель ранней разработки архитектуры использует размер, рассчитанный через backfiring FP -> KLOC.",
+            "1. Функциональные и объектные точки предзаполнены для исходного сценария брокерского мобильного приложения, но остаются редактируемыми.",
+            "2. Модель ранней разработки архитектуры использует размер, рассчитанный через пересчет функциональных точек в KLOC.",
             "3. Для SQL по умолчанию используется LOC/FP = 53 как явное и редактируемое экспертное допущение.",
             "4. Если пользователь очищает LOC/FP хотя бы для одного языка смеси, модель ранней разработки архитектуры не закрывается автоматически.",
-            "5. Значения scale factors и effort multipliers взяты из текстового описания исходного сценария.",
+            "5. Значения показателей степени и коэффициентов трудоемкости взяты из текстового описания исходного сценария.",
         ]
         self._assumptions.setPlainText("\n".join(assumptions))
 
@@ -1138,13 +1141,13 @@ class MainWindow(QMainWindow):
         fp_calculator = FunctionPointCalculator()
         application_calculator = ApplicationCompositionCalculator()
         early_calculator = EarlyDesignCalculator()
-        backfiring_service = SizeBackfiringService()
+        size_conversion_service = FunctionPointConversionService()
         exporter = CsvExportService()
 
         tabs = QTabWidget()
         self._fp_tab = FunctionPointTab(fp_calculator, preset, exporter)
         self._application_tab = ApplicationCompositionTab(application_calculator, preset, exporter)
-        self._early_tab = EarlyDesignTab(self._fp_tab, early_calculator, backfiring_service, preset, exporter)
+        self._early_tab = EarlyDesignTab(self._fp_tab, early_calculator, size_conversion_service, preset, exporter)
         self._summary_tab = SummaryTab(self._fp_tab, self._application_tab, self._early_tab, exporter)
 
         tabs.addTab(self._fp_tab, "Функциональные точки")

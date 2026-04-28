@@ -6,62 +6,62 @@ from .enums import Rating
 
 
 @dataclass(frozen=True, slots=True)
-class ScaleFactorDefinition:
+class ExponentFactorDefinition:
     identifier: str
     title: str
     values: dict[Rating, float]
 
     def value_for(self, rating: Rating) -> float:
         if rating not in self.values:
-            raise ValueError(f"Rating {rating.label} is not valid for scale factor {self.identifier}.")
+            raise ValueError(f"Уровень '{rating.label}' недопустим для показателя степени {self.identifier}.")
         return self.values[rating]
 
 
 @dataclass(frozen=True, slots=True)
-class EffortMultiplierDefinition:
+class EffortCoefficientDefinition:
     identifier: str
     title: str
     values: dict[Rating, float]
 
     def value_for(self, rating: Rating) -> float:
         if rating not in self.values:
-            raise ValueError(f"Rating {rating.label} is not valid for effort multiplier {self.identifier}.")
+            raise ValueError(f"Уровень '{rating.label}' недопустим для коэффициента трудоемкости {self.identifier}.")
         return self.values[rating]
 
 
 @dataclass(frozen=True, slots=True)
 class EarlyDesignProject:
     size: float
-    scale_factor_ratings: dict[str, Rating]
-    effort_multiplier_ratings: dict[str, Rating]
+    exponent_factor_ratings: dict[str, Rating]
+    effort_coefficient_ratings: dict[str, Rating]
     cost_per_person_month: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class EarlyDesignResult:
     exponent: float
-    scale_factor_sum: float
-    effort_adjustment_factor: float
+    exponent_factor_sum: float
+    effort_coefficient_product: float
     effort_person_months: float
     time_months: float
     average_team_size: float
     budget: float | None
 
 
-def _scale_factor(identifier: str, title: str, values: dict[Rating, float]) -> ScaleFactorDefinition:
-    return ScaleFactorDefinition(identifier=identifier, title=title, values=values)
+def _exponent_factor(identifier: str, title: str, values: dict[Rating, float]) -> ExponentFactorDefinition:
+    return ExponentFactorDefinition(identifier=identifier, title=title, values=values)
 
 
-def _effort_multiplier(
+def _effort_coefficient(
     identifier: str,
     title: str,
     values: dict[Rating, float],
-) -> EffortMultiplierDefinition:
-    return EffortMultiplierDefinition(identifier=identifier, title=title, values=values)
+) -> EffortCoefficientDefinition:
+    return EffortCoefficientDefinition(identifier=identifier, title=title, values=values)
 
 
-SCALE_FACTOR_DEFINITIONS: tuple[ScaleFactorDefinition, ...] = (
-    _scale_factor(
+EXPONENT_FACTOR_DEFINITIONS: tuple[ExponentFactorDefinition, ...] = (
+    _exponent_factor(
         "PREC",
         "Новизна проекта",
         {
@@ -73,7 +73,7 @@ SCALE_FACTOR_DEFINITIONS: tuple[ScaleFactorDefinition, ...] = (
             Rating.EXTRA_HIGH: 0.00,
         },
     ),
-    _scale_factor(
+    _exponent_factor(
         "FLEX",
         "Гибкость процесса разработки",
         {
@@ -85,7 +85,7 @@ SCALE_FACTOR_DEFINITIONS: tuple[ScaleFactorDefinition, ...] = (
             Rating.EXTRA_HIGH: 0.00,
         },
     ),
-    _scale_factor(
+    _exponent_factor(
         "RESL",
         "Разрешение рисков в архитектуре",
         {
@@ -97,7 +97,7 @@ SCALE_FACTOR_DEFINITIONS: tuple[ScaleFactorDefinition, ...] = (
             Rating.EXTRA_HIGH: 0.00,
         },
     ),
-    _scale_factor(
+    _exponent_factor(
         "TEAM",
         "Сплоченность команды",
         {
@@ -109,7 +109,7 @@ SCALE_FACTOR_DEFINITIONS: tuple[ScaleFactorDefinition, ...] = (
             Rating.EXTRA_HIGH: 0.00,
         },
     ),
-    _scale_factor(
+    _exponent_factor(
         "PMAT",
         "Зрелость процесса разработки",
         {
@@ -124,8 +124,8 @@ SCALE_FACTOR_DEFINITIONS: tuple[ScaleFactorDefinition, ...] = (
     ),
 )
 
-EFFORT_MULTIPLIER_DEFINITIONS: tuple[EffortMultiplierDefinition, ...] = (
-    _effort_multiplier(
+EFFORT_COEFFICIENT_DEFINITIONS: tuple[EffortCoefficientDefinition, ...] = (
+    _effort_coefficient(
         "PERS",
         "Квалификация персонала",
         {
@@ -137,7 +137,7 @@ EFFORT_MULTIPLIER_DEFINITIONS: tuple[EffortMultiplierDefinition, ...] = (
             Rating.EXTRA_HIGH: 0.50,
         },
     ),
-    _effort_multiplier(
+    _effort_coefficient(
         "RCPX",
         "Надежность и сложность продукта",
         {
@@ -149,7 +149,7 @@ EFFORT_MULTIPLIER_DEFINITIONS: tuple[EffortMultiplierDefinition, ...] = (
             Rating.EXTRA_HIGH: 2.72,
         },
     ),
-    _effort_multiplier(
+    _effort_coefficient(
         "RUSE",
         "Требуемый уровень повторного использования",
         {
@@ -160,7 +160,7 @@ EFFORT_MULTIPLIER_DEFINITIONS: tuple[EffortMultiplierDefinition, ...] = (
             Rating.EXTRA_HIGH: 1.24,
         },
     ),
-    _effort_multiplier(
+    _effort_coefficient(
         "PDIF",
         "Сложность платформы",
         {
@@ -171,7 +171,7 @@ EFFORT_MULTIPLIER_DEFINITIONS: tuple[EffortMultiplierDefinition, ...] = (
             Rating.EXTRA_HIGH: 2.61,
         },
     ),
-    _effort_multiplier(
+    _effort_coefficient(
         "PREX",
         "Опыт работы в предметной области и на платформе",
         {
@@ -183,7 +183,7 @@ EFFORT_MULTIPLIER_DEFINITIONS: tuple[EffortMultiplierDefinition, ...] = (
             Rating.EXTRA_HIGH: 0.62,
         },
     ),
-    _effort_multiplier(
+    _effort_coefficient(
         "FCIL",
         "Возможности инструментальных средств",
         {
@@ -195,7 +195,7 @@ EFFORT_MULTIPLIER_DEFINITIONS: tuple[EffortMultiplierDefinition, ...] = (
             Rating.EXTRA_HIGH: 0.62,
         },
     ),
-    _effort_multiplier(
+    _effort_coefficient(
         "SCED",
         "Требуемые сроки разработки",
         {
@@ -208,12 +208,12 @@ EFFORT_MULTIPLIER_DEFINITIONS: tuple[EffortMultiplierDefinition, ...] = (
     ),
 )
 
-_SCALE_FACTOR_MAP: dict[str, ScaleFactorDefinition] = {
-    item.identifier: item for item in SCALE_FACTOR_DEFINITIONS
+_EXPONENT_FACTOR_MAP: dict[str, ExponentFactorDefinition] = {
+    item.identifier: item for item in EXPONENT_FACTOR_DEFINITIONS
 }
 
-_EFFORT_MULTIPLIER_MAP: dict[str, EffortMultiplierDefinition] = {
-    item.identifier: item for item in EFFORT_MULTIPLIER_DEFINITIONS
+_EFFORT_COEFFICIENT_MAP: dict[str, EffortCoefficientDefinition] = {
+    item.identifier: item for item in EFFORT_COEFFICIENT_DEFINITIONS
 }
 
 
@@ -221,17 +221,17 @@ class EarlyDesignCalculator:
     def estimate(self, project: EarlyDesignProject) -> EarlyDesignResult:
         self._validate(project)
 
-        scale_factor_sum = 0.0
-        for identifier, definition in _SCALE_FACTOR_MAP.items():
-            scale_factor_sum += definition.value_for(project.scale_factor_ratings[identifier])
+        exponent_factor_sum = 0.0
+        for identifier, definition in _EXPONENT_FACTOR_MAP.items():
+            exponent_factor_sum += definition.value_for(project.exponent_factor_ratings[identifier])
 
-        exponent = 1.01 + 0.01 * scale_factor_sum
+        exponent = 1.01 + 0.01 * exponent_factor_sum
 
-        effort_adjustment_factor = 1.0
-        for identifier, definition in _EFFORT_MULTIPLIER_MAP.items():
-            effort_adjustment_factor *= definition.value_for(project.effort_multiplier_ratings[identifier])
+        effort_coefficient_product = 1.0
+        for identifier, definition in _EFFORT_COEFFICIENT_MAP.items():
+            effort_coefficient_product *= definition.value_for(project.effort_coefficient_ratings[identifier])
 
-        effort_person_months = 2.45 * effort_adjustment_factor * (project.size ** exponent)
+        effort_person_months = 2.45 * effort_coefficient_product * (project.size ** exponent)
         schedule_exponent = 0.33 + 0.2 * (exponent - 1.01)
         time_months = 3.0 * (effort_person_months ** schedule_exponent)
         average_team_size = effort_person_months / time_months
@@ -239,8 +239,8 @@ class EarlyDesignCalculator:
 
         return EarlyDesignResult(
             exponent=exponent,
-            scale_factor_sum=scale_factor_sum,
-            effort_adjustment_factor=effort_adjustment_factor,
+            exponent_factor_sum=exponent_factor_sum,
+            effort_coefficient_product=effort_coefficient_product,
             effort_person_months=effort_person_months,
             time_months=time_months,
             average_team_size=average_team_size,
@@ -250,10 +250,10 @@ class EarlyDesignCalculator:
     @staticmethod
     def _validate(project: EarlyDesignProject) -> None:
         if project.size <= 0:
-            raise ValueError("Project size must be positive.")
-        if set(project.scale_factor_ratings) != set(_SCALE_FACTOR_MAP):
-            raise ValueError("All five scale factors must be provided.")
-        if set(project.effort_multiplier_ratings) != set(_EFFORT_MULTIPLIER_MAP):
-            raise ValueError("All seven effort multipliers must be provided.")
+            raise ValueError("Размер проекта должен быть положительным.")
+        if set(project.exponent_factor_ratings) != set(_EXPONENT_FACTOR_MAP):
+            raise ValueError("Нужно указать все пять показателей степени.")
+        if set(project.effort_coefficient_ratings) != set(_EFFORT_COEFFICIENT_MAP):
+            raise ValueError("Нужно указать все семь коэффициентов трудоемкости.")
         if project.cost_per_person_month is not None and project.cost_per_person_month < 0:
-            raise ValueError("Cost per person-month cannot be negative.")
+            raise ValueError("Стоимость человеко-месяца не может быть отрицательной.")

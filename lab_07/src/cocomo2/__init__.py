@@ -8,8 +8,8 @@ from .application_composition import (
     ProductivityLevel,
 )
 from .early_design import (
-    EFFORT_MULTIPLIER_DEFINITIONS,
-    SCALE_FACTOR_DEFINITIONS,
+    EFFORT_COEFFICIENT_DEFINITIONS,
+    EXPONENT_FACTOR_DEFINITIONS,
     EarlyDesignCalculator,
     EarlyDesignProject,
     EarlyDesignResult,
@@ -26,16 +26,16 @@ from .function_points import (
     build_characteristics,
 )
 from .presets import Lab7VariantPreset, build_variant_2_preset
-from .size_conversion import BackfiringProject, BackfiringResult, LanguageFootprint, SizeBackfiringService
+from .size_conversion import FunctionPointConversionService, LanguageFootprint, SizeConversionProject, SizeConversionResult
 
 __all__ = [
     "ApplicationCompositionCalculator",
     "ApplicationCompositionProject",
     "ApplicationCompositionResult",
-    "BackfiringProject",
-    "BackfiringResult",
+    "SizeConversionProject",
+    "SizeConversionResult",
     "ComplexityLevel",
-    "EFFORT_MULTIPLIER_DEFINITIONS",
+    "EFFORT_COEFFICIENT_DEFINITIONS",
     "EarlyDesignCalculator",
     "EarlyDesignProject",
     "EarlyDesignResult",
@@ -53,8 +53,8 @@ __all__ = [
     "ProductivityLevel",
     "RatedFunctionPointComponent",
     "Rating",
-    "SCALE_FACTOR_DEFINITIONS",
-    "SizeBackfiringService",
+    "EXPONENT_FACTOR_DEFINITIONS",
+    "FunctionPointConversionService",
     "SystemCharacteristic",
     "build_characteristics",
     "build_variant_2_preset",

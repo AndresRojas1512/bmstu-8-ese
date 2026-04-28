@@ -115,7 +115,7 @@ def build_characteristics(values: dict[int, int]) -> tuple[SystemCharacteristic,
     ordered: list[SystemCharacteristic] = []
     for identifier in range(1, len(FUNCTION_POINT_CHARACTERISTICS) + 1):
         if identifier not in values:
-            raise ValueError(f"Missing system characteristic {identifier}.")
+            raise ValueError(f"Отсутствует системная характеристика {identifier}.")
         ordered.append(SystemCharacteristic(definition=_CHARACTERISTIC_MAP[identifier], value=values[identifier]))
     return tuple(ordered)
 
@@ -174,24 +174,24 @@ class FunctionPointCalculator:
     @staticmethod
     def _validate_project(project: FunctionPointProject) -> None:
         if not project.components:
-            raise ValueError("At least one function point component is required.")
+            raise ValueError("Нужно указать хотя бы одну функциональную компоненту.")
         if len(project.characteristics) != len(FUNCTION_POINT_CHARACTERISTICS):
-            raise ValueError("Exactly 14 system characteristics are required.")
+            raise ValueError("Нужно указать ровно 14 системных характеристик.")
 
         seen_ids: set[int] = set()
         for characteristic in project.characteristics:
             identifier = characteristic.definition.identifier
             if identifier in seen_ids:
-                raise ValueError(f"Duplicate system characteristic {identifier}.")
+                raise ValueError(f"Системная характеристика {identifier} указана дважды.")
             seen_ids.add(identifier)
             if characteristic.value < 0 or characteristic.value > 5:
-                raise ValueError(f"Characteristic {identifier} must be between 0 and 5.")
+                raise ValueError(f"Значение характеристики {identifier} должно быть в диапазоне от 0 до 5.")
 
         for component in project.components:
             if component.det_count <= 0:
-                raise ValueError(f"DET count must be positive for '{component.name}'.")
+                raise ValueError(f"Количество DET для '{component.name}' должно быть положительным.")
             if component.reference_count < 0:
-                raise ValueError(f"Reference count cannot be negative for '{component.name}'.")
+                raise ValueError(f"Количество ссылок для '{component.name}' не может быть отрицательным.")
 
 
 def _band_index(value: int, thresholds: tuple[int, int]) -> int:

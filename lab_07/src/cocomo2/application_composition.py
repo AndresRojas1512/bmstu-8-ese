@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .enums import Rating
-from .early_design import SCALE_FACTOR_DEFINITIONS
+from .early_design import EXPONENT_FACTOR_DEFINITIONS
 
 
 class ObjectPointKind(Enum):
@@ -57,7 +57,7 @@ class ApplicationCompositionProject:
     items: tuple[ObjectPointItem, ...]
     reuse_percent: float
     productivity_level: ProductivityLevel
-    scale_factor_ratings: dict[str, Rating]
+    exponent_factor_ratings: dict[str, Rating]
     cost_per_person_month: float | None = None
 
 
@@ -100,10 +100,10 @@ class ApplicationCompositionCalculator:
         rated_items = tuple(self._rate_item(item) for item in project.items)
         object_points = float(sum(item.points for item in rated_items))
         new_object_points = object_points * (100.0 - project.reuse_percent) / 100.0
-        scale_factor_sum = 0.0
-        for definition in SCALE_FACTOR_DEFINITIONS:
-            scale_factor_sum += definition.value_for(project.scale_factor_ratings[definition.identifier])
-        exponent = 1.01 + 0.01 * scale_factor_sum
+        exponent_factor_sum = 0.0
+        for definition in EXPONENT_FACTOR_DEFINITIONS:
+            exponent_factor_sum += definition.value_for(project.exponent_factor_ratings[definition.identifier])
+        exponent = 1.01 + 0.01 * exponent_factor_sum
         effort_person_months = new_object_points / project.productivity_level.productivity
         schedule_exponent = 0.33 + 0.2 * (exponent - 1.01)
         time_months = 3.0 * (effort_person_months ** schedule_exponent)
@@ -131,7 +131,7 @@ class ApplicationCompositionCalculator:
             return 10
 
         if item.complexity is None:
-            raise ValueError(f"Complexity is required for '{item.name}'.")
+            raise ValueError(f"Для элемента '{item.name}' нужно указать сложность.")
 
         if item.kind is ObjectPointKind.SCREEN:
             return _SCREEN_WEIGHTS[item.complexity]
@@ -140,14 +140,14 @@ class ApplicationCompositionCalculator:
     @staticmethod
     def _validate(project: ApplicationCompositionProject) -> None:
         if not project.items:
-            raise ValueError("At least one object point item is required.")
+            raise ValueError("Нужно указать хотя бы один элемент объектных точек.")
         if project.reuse_percent < 0 or project.reuse_percent > 100:
-            raise ValueError("Reuse percent must be between 0 and 100.")
-        if set(project.scale_factor_ratings) != {definition.identifier for definition in SCALE_FACTOR_DEFINITIONS}:
-            raise ValueError("All five scale factors must be provided.")
+            raise ValueError("Процент повторного использования должен быть в диапазоне от 0 до 100.")
+        if set(project.exponent_factor_ratings) != {definition.identifier for definition in EXPONENT_FACTOR_DEFINITIONS}:
+            raise ValueError("Нужно указать все пять показателей степени.")
         if project.cost_per_person_month is not None and project.cost_per_person_month < 0:
-            raise ValueError("Cost per person-month cannot be negative.")
+            raise ValueError("Стоимость человеко-месяца не может быть отрицательной.")
 
         for item in project.items:
             if item.count <= 0:
-                raise ValueError(f"Count must be positive for '{item.name}'.")
+                raise ValueError(f"Количество для элемента '{item.name}' должно быть положительным.")
